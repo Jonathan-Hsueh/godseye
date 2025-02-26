@@ -1,0 +1,215 @@
+body.light-mode {
+  background-color: #f5f5f5;
+  color: #000000;
+  transition: background-color 0.5s, color 0.5s;
+}
+
+body.dark-mode {
+  background-color: #1e1e1e;
+  color: #ffffff;
+  transition: background-color 0.5s, color 0.5s;
+}
+
+.background-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+  overflow: auto;
+}
+
+.layered-header {
+  width: 100%;
+  height: 70px;
+  opacity: 50%;
+  position: fixed;
+  top: 0;
+  z-index: 10;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.5s, color 0.5s;
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.08), 0 2px 4px 0 rgba(0, 0, 0, 0.12);
+}
+
+.light-header {
+  background-color: #ebeef1;
+  opacity: 100%;
+  color: #000000;
+}
+
+.dark-header {
+  background-color: #2a2a2a;
+  opacity: 100%;
+  color: #ffffff;
+}
+
+.header-text {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  position: relative;
+}
+
+/* Layered box */
+.layered-box {
+  width: 80%;
+  height: 80%;
+  border-radius: 25px;
+  border: 2px groove rgba(70, 130, 180, 0.8);
+  transition: background-color 0.5s, color 0.5s;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.light-box {
+  background-color: #f2f9ff;
+  color: #000000;
+}
+
+.dark-box {
+  background-color: #3c3c3f;
+  color: #ffffff;
+}
+
+.inside-box {
+  width: 95%;
+  height: 90%;
+  border: 1px dashed rgba(120, 120, 120, 0.5);
+  border-radius: 25px;
+}
+
+.webcam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+/* File and RTMP Image Buttons */
+.icon-box {
+  width: 100%;
+  height: 500px;
+  display: flex;
+  justify-content: center;
+}
+
+.file-btn,
+.rtmp-btn {
+  width: 50%;
+  background-color: transparent;
+  transition: transform 0.5s ease;
+}
+
+.file-btn:hover,
+.rtmp-btn:hover {
+  transform: scale(1.1);
+}
+
+.file-icon,
+.rtmp-icon {
+  width: 50%;
+}
+
+/* Detection and Webcam Buttons */
+.selection-container {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+}
+
+.detection-button,
+.webcam-button {
+  width: 50%;
+  height: 35px;
+  border-radius: 20px;
+  transition: background-color 0.5s, color 0.5s, transform 0.5s ease;
+}
+
+.detection-button:hover,
+.webcam-button:hover {
+  transform: translateY(-2px);
+  background-color: rgba(70, 130, 180, 0.9); /* Slight pop-up effect with color tint */
+}
+
+.dark-dtbtn {
+  background-color: #3c3c3f;
+  color: #ffffff;
+}
+
+.light-dtbtn {
+  background-color: #f2f9ff;
+  color: #000000;
+}
+
+.dark-webcam {
+  background-color: #3c3c3f;
+  color: #ffffff;
+}
+
+.light-webcam {
+  background-color: #f2f9ff;
+  color: #000000;
+}
+
+.button-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+}
+
+.toggle-circle {
+  cursor: pointer;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  background-color: rgb(131, 144, 209);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.toggle-circle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-icon {
+  width: 50px;
+  height: 70%;
+  object-fit: contain;
+  background-color: transparent;
+}
+
+
+.image-display-container {
+  margin-top: 20px;
+  width: 90%;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+  text-align: center;
+  max-width: 600px;
+}
+
+.uploaded-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+html, body {
+  height: auto;
+  min-height: 100vh;
+  overflow-x: hidden;
+}

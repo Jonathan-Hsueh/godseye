@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
+import base64
 from ultralytics import YOLO
-import io
-from PIL import Image
 import numpy as np
 import cv2
 import os
@@ -9,36 +8,49 @@ from flask_cors import CORS, cross_origin
 
 app = Flask("VideoBackend")
 
-CORS(app)
-model = YOLO("../backenddesign/trainedmodel.pt")
+CORS(app, resources={
+    r"/*": {
+        "origins": "http://localhost:5173",
+        "supports_credentials": True,
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
+model = YOLO("../trainedmodel.pt")
+
+def _build_cors_preflight_response():
+    response = jsonify({"message": "Preflight Accepted"})
+    response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
+    response.headers.add("Access-Control-Allow-Headers", "*")
+    response.headers.add("Access-Control-Allow-Methods", "*")
+    return response
 
 @app.route('/upload_video_chunk', methods=['POST'])
-@cross_origin()
-def upload_video_chunk(): 
-    if 'video_chunk' not in request.files: 
-        return jsonify({'error': 'No video chunk provided'}), 400
+def upload_video_chunk():
+    if 'video_chunk' not in request.files:
+        return jsonify({'error': 'No video chunk'}), 400
+
+    chunk = request.files['video_chunk']
     
-    video_chunk_file = request.files['video_chunk']
-    video_chunk_bytes = video_chunk_file.read()
+    # Save chunk to a temporary file
+    temp_file = "/tmp/chunk.webm"
+    chunk.save(temp_file)
     
-    nparr = np.frombuffer(video_chunk_bytes, np.uint8)
-    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    cap = cv2.VideoCapture(temp_file)
+    success, frame = cap.read()
+    cap.release()
+    os.remove(temp_file)  # Cleanup
     
-    if frame is None:
-        return jsonify({'error': 'Invalid chunk data'}), 400
-    
+    if not success:
+        return jsonify({'error': 'Failed to read video chunk'}), 400
+
     results = model(frame)
     annotated_frame = results[0].plot()
     
-    _, annotated_frame_bytes = cv2.imencode('.JPEG', annotated_frame)
-    annotated_frame_base64 = base64.b64encode(annotated_frame_bytes).decode('utf-8')
+    _, buffer = cv2.imencode('.JPEG', annotated_frame)
+    response = base64.b64encode(buffer).decode('utf-8')
     
-    return jsonify({
-        'annotated_chunk': annotated_frame_base64,
-        'shape': annotated_frame.shape,
-        'dtype': str(annotated_frame.dtype)
-    }), 200
+    return jsonify({'annotated_chunk': response}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', debug=True, port=8000)

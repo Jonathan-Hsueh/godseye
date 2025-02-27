@@ -18,14 +18,13 @@ const BackgroundComponent = ({ isDarkMode, toggleBackground }) => {
   const [detectingWebcam, setDetectingWebcam] = useState(false);
 
   const [capturing, setCapturing] = useState(false);
-  const [recordedChunks, setRecordedChunks] = useState([]);
   const [isWebcam, setIsWebcam] = useState(false);
   const [isRTMP, setIsRTMP] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [processedImage, setProcessedImage] = useState(null);
 
-  const backendUrl = "http://0.0.0.0:8000";
-  const backendVideoUrl = "http://0.0.0.0:80";
+  const backendUrl = "http://localhost:8000";
+  const backendVideoUrl = "http://localhost:8000";
 
   const handleToggleRTMP = () => setIsRTMP(!isRTMP);
 
@@ -113,6 +112,7 @@ const BackgroundComponent = ({ isDarkMode, toggleBackground }) => {
     }
   };
 
+  // webcam video chunk post request
   const sendChunkToServer = async (chunk) => {
     if (!detectingWebcam) {
       return;
@@ -129,15 +129,30 @@ const BackgroundComponent = ({ isDarkMode, toggleBackground }) => {
       const response = await fetch(backendVideoUrl + "/upload_video_chunk", {
         method: 'POST', 
         body: formData,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+      
+      // In sendChunkToServer()
       const json = await response.json();
       const annotatedFrame = json.annotated_chunk;
-      const blob = new Blob([annotatedFrame], {type: 'image/jpeg'});
+
+      // Convert base64 to Blob
+      const byteCharacters = atob(annotatedFrame);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+      // Update video source
       const url = URL.createObjectURL(blob);
       setDetectSrc(url);
     } catch (error) {

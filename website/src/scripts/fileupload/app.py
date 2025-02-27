@@ -7,7 +7,7 @@ from PIL import Image
 
 app = FastAPI()
 
-model = YOLO("trainedmodel.pt")
+model = YOLO("../trainedmodel.pt")
 
 app.add_middleware(
     CORSMiddleware,

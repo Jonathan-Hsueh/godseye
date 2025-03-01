@@ -27,13 +27,32 @@ const BackgroundComponent = ({ isDarkMode, toggleBackground }) => {
   const [detectSrc, setDetectSrc] = useState(null);
   const [streamUrl, setStreamUrl] = useState("");
   const [modelLoaded, setModelLoaded] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const [classNames] = useState(["gun"]); // Update with your classes
+  const [processing, setProcessing] = useState(false);
 
+  const scaleBoxes = (box, currentShape, originalShape = [640, 640]) => {
+    // Calculate scale factor (width, height)
+    const gain = Math.min(originalShape[0]/currentShape[0], originalShape[1]/currentShape[1]);
+    
+    // Calculate padding (x, y)
+    const pad = [
+      (originalShape[0] - currentShape[0] * gain) / 2, 
+      (originalShape[1] - currentShape[1] * gain) / 2
+    ];
+  
+    // Scale box coordinates to original image size
+    return [
+      (box[0] - pad[0]) / gain,  // x
+      (box[1] - pad[1]) / gain,  // y
+      box[2] / gain,             // width
+      box[3] / gain              // height
+    ];
+  };
+  
   useEffect(() => {
     const loadModel = async () => {
       try {
-        const model = await tf.loadGraphModel('/models/model.json');
+        const model = await tf.loadGraphModel('./models/model.json');
         modelRef.current = model;
         setModelLoaded(true);
         console.log("Model loaded successfully");
@@ -126,114 +145,129 @@ const BackgroundComponent = ({ isDarkMode, toggleBackground }) => {
 
   // Image processing
   // In handleFileImage function, update the detection handling:
-const handleFileImage = async () => {
-  if (!selectedFile || !modelLoaded) return;
-
-  const img = new Image();
-  img.src = URL.createObjectURL(selectedFile);
+  const handleFileImage = async () => {
+    if (!selectedFile || !modelLoaded) return;
   
-  img.onload = async () => {
+    const img = new Image();
+    img.src = URL.createObjectURL(selectedFile);
+    
+    img.onload = async () => {
+      try {
+        setProcessing(true);
+        const detections = await detectObjects(img);
+        
+        // Apply Non-Maximum Suppression
+        const keepIndices = applyNMS(detections.boxes, detections.scores);
+        const filteredBoxes = keepIndices.map(i => detections.boxes[i]);
+        const filteredScores = keepIndices.map(i => detections.scores[i]);
+        const filteredClasses = keepIndices.map(i => detections.classes[i]);
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+  
+        // Draw filtered detections
+        filteredBoxes.forEach((box, index) => {
+          const [x, y, w, h] = box;
+          const score = filteredScores[index];
+          const className = classNames[filteredClasses[index]];
+  
+          // Scale boxes to original image dimensions
+          const scaledBox = scaleBoxes(
+            [x, y, w, h],
+            [640, 640],
+            [img.naturalWidth, img.naturalHeight]
+          );
+  
+          // Calculate coordinates
+          const left = scaledBox[0] - scaledBox[2]/2;
+          const top = scaledBox[1] - scaledBox[3]/2;
+          const width = scaledBox[2];
+          const height = scaledBox[3];
+  
+          // Draw elements
+          ctx.strokeStyle = '#FF0000';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(left, top, width, height);
+          
+          ctx.fillStyle = '#FF0000';
+          ctx.fillText(`${className} ${(score * 100).toFixed(1)}%`, left + 5, top + 20);
+        });
+        
+        canvas.toBlob((blob) => {
+          const processedUrl = URL.createObjectURL(blob);
+          setProcessedImage(processedUrl);
+        }, 'image/jpeg', 0.9);
+        
+      } catch (error) {
+        console.error("Detection error:", error);
+        alert(`Detection failed: ${error.message}`);
+      } finally {
+        setProcessing(false);
+      }
+    };
+  };
+  
+  // Updated processVideoFrame function
+  const processVideoFrame = async () => {
+    if (!webcamRef.current || !detectingWebcam || !modelLoaded) return;
+  
     try {
-      setProcessing(true);
-      const detections = await detectObjects(img);
+      const video = webcamRef.current.video;
+      const detections = await detectObjects(video);
       
-      // Apply Non-Maximum Suppression
-      
-      const keepIndices = applyNMS(detections.boxes, detections.scores); // problematic line
+      // Apply NMS
+      const keepIndices = applyNMS(detections.boxes, detections.scores);
       const filteredBoxes = keepIndices.map(i => detections.boxes[i]);
       const filteredScores = keepIndices.map(i => detections.scores[i]);
       const filteredClasses = keepIndices.map(i => detections.classes[i]);
-      
+  
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      
+      ctx.drawImage(video, 0, 0);
+  
       // Draw filtered detections
       filteredBoxes.forEach((box, index) => {
         const [x, y, w, h] = box;
         const score = filteredScores[index];
-        
-        // Coordinate conversion
-        const scaleX = canvas.width / 640;
-        const scaleY = canvas.height / 640;
-        const left = (x - w/2) * scaleX;
-        const top = (y - h/2) * scaleY;
-        const width = w * scaleX;
-        const height = h * scaleY;
-
-        // Draw elements
+        const className = classNames[filteredClasses[index]];
+  
+        // Scale boxes to video dimensions
+        const scaledBox = scaleBoxes(
+          [x, y, w, h],
+          [640, 640],
+          [video.videoWidth, video.videoHeight]
+        );
+  
+        // Calculate coordinates
+        const left = scaledBox[0] - scaledBox[2]/2;
+        const top = scaledBox[1] - scaledBox[3]/2;
+        const width = scaledBox[2];
+        const height = scaledBox[3];
+  
         ctx.strokeStyle = '#FF0000';
         ctx.lineWidth = 3;
         ctx.strokeRect(left, top, width, height);
         
         ctx.fillStyle = '#FF0000';
-        ctx.fillText(`gun ${(score * 100).toFixed(1)}%`, left + 5, top + 20);
+        ctx.fillText(`${className} ${(score * 100).toFixed(1)}%`, left + 5, top + 20);
       });
+  
+      const stream = canvas.captureStream(25);
+      if (detectRef.current) {
+        detectRef.current.srcObject = stream;
+      }
       
-      canvas.toBlob((blob) => {
-        const processedUrl = URL.createObjectURL(blob);
-        setProcessedImage(processedUrl);
-      }, 'image/jpeg', 0.9);
-      
+      requestAnimationFrame(processVideoFrame);
     } catch (error) {
-      console.error("Detection error:", error);
-      alert(`Detection failed: ${error.message}`);
-    } finally {
-      setProcessing(false);
+      console.error("Video processing error:", error);
+      setDetectingWebcam(false);
     }
   };
-};
-
-// In processVideoFrame function, update similarly:
-const processVideoFrame = async () => {
-  if (!webcamRef.current || !detectingWebcam || !modelLoaded) return;
-
-  try {
-    const video = webcamRef.current.video;
-    const detections = await detectObjects(video);
-    
-    // Apply NMS
-    const keepIndices = applyNMS(detections.boxes, detections.scores);
-    const filteredBoxes = keepIndices.map(i => detections.boxes[i]);
-    const filteredScores = keepIndices.map(i => detections.scores[i]);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-
-    // Draw filtered detections
-    filteredBoxes.forEach((box, index) => {
-      const [x, y, w, h] = box;
-      const score = filteredScores[index];
-      
-      const left = (x - w/2) * canvas.width;
-      const top = (y - h/2) * canvas.height;
-      const width = w * canvas.width;
-      const height = h * canvas.height;
-
-      ctx.strokeStyle = '#FF0000';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(left, top, width, height);
-      
-      ctx.fillStyle = '#FF0000';
-      ctx.fillText(`gun ${(score * 100).toFixed(1)}%`, left + 5, top + 20);
-    });
-
-    const stream = canvas.captureStream(25);
-    if (detectRef.current) {
-      detectRef.current.srcObject = stream;
-    }
-    
-    requestAnimationFrame(processVideoFrame);
-  } catch (error) {
-    console.error("Video processing error:", error);
-    setDetectingWebcam(false);
-  }
-};
   // Webcam toggle
 
   const handleToggleRTMP = () => setIsRTMP(!isRTMP);
@@ -307,37 +341,6 @@ const processVideoFrame = async () => {
     };
   };
   
-
-
-  const handleStartDetection = async () => {
-    if (!selectedFile) {
-      alert("Please upload a file before starting detection.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-
-    try {
-      const response = await fetch(backendUrl + "/upload/", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      console.log("Received Blob:", blob);
-      setProcessedImage(imageUrl);
-      console.log("Generated Image URL:", imageUrl);
-    } catch (error) {
-      console.error("Error processing file:", error);
-    }
-  };
-
   const handleStartCaptureClick = useCallback(() => {
     if (webcamRef.current && webcamRef.current.stream != null) {
       setCapturing(true);
@@ -357,63 +360,6 @@ const processVideoFrame = async () => {
     }, 2000);
   }, []);
 // mediarecorderref = handledataavailable so it gets the data chunk
-
-  const handleDataAvailable = async (event) => {
-    console.log("Before part is running");    
-    if (event.data.size > 0) {
-      console.log("This part is running");
-      await sendChunkToServer(event.data);
-    }
-  };
-
-  // webcam video chunk post request
-  const sendChunkToServer = async (chunk) => {
-    if (!detectingWebcam) {
-      return;
-    }
-    if (!webcamRef.current) {
-      alert("Please turn on webcam before detection.");
-      return;
-    }
-    try {
-      const formData = new FormData();
-      formData.append("video_chunk", new Blob([chunk], {type: "video/webm"
-    }));
-
-      const response = await fetch(backendVideoUrl + "/upload_video_chunk", {
-        method: 'POST', 
-        body: formData,
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      // In sendChunkToServer()
-      const json = await response.json();
-      const annotatedFrame = json.annotated_chunk;
-
-      // Convert base64 to Blob
-      const byteCharacters = atob(annotatedFrame);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-      // Update video source
-      const url = URL.createObjectURL(blob);
-      setDetectSrc(url);
-    } catch (error) {
-      console.error("Error during POST and blob conversion:", error);
-      throw error;
-    }
-  }
 
   useEffect(() =>{
     if (detectSrc) {
